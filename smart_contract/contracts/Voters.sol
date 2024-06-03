@@ -48,16 +48,16 @@ contract Voters {
   mapping (uint=>History[]) userHistory;
   mapping (address=>uint) UserToId;
   mapping (address=>bool) userExists;
-  mapping (uint=>bool) UserRole;
+  mapping (uint=>bool) public UserRole;
   mapping (uint=>mapping(uint=>bool)) candidateMap;
   mapping (uint=>mapping(uint=>bool)) electionToCandidate;
   mapping (uint=>mapping(uint=>bool)) userToElection;
-  mapping (uint=>mapping(uint=>bool)) userVote;
+  mapping (uint=>mapping(uint=>bool)) public userVote;
   mapping (uint=>mapping(uint=>uint)) userElectionCandidateMap;
 
   constructor(){
     string memory hsh="d%4c50e2dbA5&ed&dd90U&2d-R]73d1]Wc73+54u9bKx45672ib26f0p1Nmk_+20cpdC(b5712";
-    address addr=0xCDbD5B3D6347eedbDC0149bF920527D525412D25;
+    address addr=0x76C88457A491848E66673E603725eBde8119d59A;
     userlist.push(User(0,"000000000000","Admin","admin@admin.admin",collisionHash(hsh),'0','MRSDSMCVGJSFENZT',true));
     voterList.push(userlist[0]);
     UserRole[0]=true;
@@ -105,15 +105,6 @@ contract Voters {
     return result;
   }
 
-  function isCandidateMapped(uint electionID,uint regNo) public view returns (bool){
-    if(candidateMap[regNo][electionID]==true){
-      return true;
-    }
-    else{
-      return false;
-    }
-  }
-
   function getCandidates(uint id) external view returns(Candidate[] memory){
     Candidate[] memory temp=new Candidate[](candidateList.length);
     uint counter=0;
@@ -139,7 +130,7 @@ contract Voters {
   }
 
   function addCandidate(string memory name,uint256 regNo,uint electionID) public{
-    require(!isCandidateMapped(electionID,regNo),"Already Added!");
+    require(!candidateMap[regNo][electionID],"Already Added!");
     uint candidateID=candidateList.length;
     candidateList.push(Candidate(candidateID,name,regNo,0));
     candidateMap[regNo][electionID]=true;
@@ -153,7 +144,7 @@ contract Voters {
 
   function addElection(string memory name) external {
     uint ID=electionList.length;
-    electionList.push(Election(ID,name,0,0,false,false,UserToId[getSender()]));
+    electionList.push(Election(ID,name,0,0,false,false,UserToId[msg.sender]));
     addCandidate("None of the Above",0,ID);
   }
 
@@ -162,7 +153,7 @@ contract Voters {
   }
 
   function isAdminMain() private view returns (bool){
-    if(UserToId[getSender()]==0)
+    if(UserToId[msg.sender]==0)
       return true;
     else
       return false;
@@ -179,7 +170,7 @@ contract Voters {
           temp[counter]=electionList[i-1];
           counter++;
         }
-        else if(electionList[i-1].createdBy==UserToId[getSender()]){
+        else if(electionList[i-1].createdBy==UserToId[msg.sender]){
           temp[counter]=electionList[i-1];
           counter++;
         }
@@ -202,7 +193,7 @@ contract Voters {
           temp[counter]=electionList[i];
           counter++;
         }
-        else if(electionList[i].createdBy==UserToId[getSender()]){
+        else if(electionList[i].createdBy==UserToId[msg.sender]){
           temp[counter]=electionList[i];
           counter++;
         }
@@ -216,7 +207,7 @@ contract Voters {
   }
 
   function isUserRegistered() public view returns (bool){
-    if(userExists[getSender()]==true){
+    if(userExists[msg.sender]==true){
       return true;
     }
     else{
@@ -226,7 +217,7 @@ contract Voters {
 
   function loginUser(string memory pass,string memory aadhar) external view returns (bool){
     require(isUserRegistered());
-    User memory tmp=userlist[UserToId[getSender()]];
+    User memory tmp=userlist[UserToId[msg.sender]];
     bytes32 chkHash=keccak256(abi.encode(pass));
     if(tmp.pass==chkHash && (keccak256(abi.encodePacked(tmp.aadhar)) == keccak256(abi.encodePacked(aadhar)))){
       return true;
@@ -237,18 +228,15 @@ contract Voters {
   }
 
   function setPass(string memory _pass) public {
-    userlist[UserToId[getSender()]].pass=keccak256(abi.encode(_pass));
+    userlist[UserToId[msg.sender]].pass=keccak256(abi.encode(_pass));
   }
 
   function switchRole(uint id) public{
     require(id!=0);
-    require(id!=UserToId[getSender()]);
+    require(id!=UserToId[msg.sender]);
     UserRole[id]=!UserRole[id];
   }
 
-  function getUserRole(uint id) public view returns (bool){
-    return UserRole[id];
-  }
 
   function collisionHash(string memory _string1) public pure returns (bytes32) {
     return keccak256(abi.encode(_string1));
@@ -258,10 +246,10 @@ contract Voters {
     require(!isUserRegistered(),"Already Registered!");
     uint userID=userlist.length;
     bytes32 hsh=collisionHash(pass);
-    UserToId[getSender()]=userID;
+    UserToId[msg.sender]=userID;
     UserRole[userID]=false;
     userlist.push(User(userID,aadhar,name,email,hsh,cid,key,isValidated));
-    userExists[getSender()]=true;
+    userExists[msg.sender]=true;
   }
 
   function ValidateUser(uint userID) public{
@@ -293,13 +281,9 @@ contract Voters {
     return result;
   }
 
-  function getSender() public view returns(address) {
-    return msg.sender;  
-  }
-
   function getUserDetails() public view returns(User memory){
-    require(userExists[getSender()]==true,"User does not exist");
-    return userlist[UserToId[getSender()]];
+    require(userExists[msg.sender]==true,"User does not exist");
+    return userlist[UserToId[msg.sender]];
   }
 
   function getMappedElections(uint id) public view returns(Election[] memory){
@@ -334,12 +318,8 @@ contract Voters {
     return result;
   }
 
-  function checkVote(uint userid,uint electionid) public view returns(bool){
-    return userVote[userid][electionid];
-  } 
-
   function castVote(uint userid,uint electionid,uint candidateid) public {
-    require(UserToId[getSender()]==userid,"Unauthorized access detected!");
+    require(UserToId[msg.sender]==userid,"Unauthorized access detected!");
     require(!userVote[userid][electionid],"Already Voted!");
     userElectionCandidateMap[userid][electionid]=candidateid;
     userVote[userid][electionid]=true;
